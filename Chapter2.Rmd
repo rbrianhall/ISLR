@@ -1,0 +1,116 @@
+---
+title: "Chapter 2 - ISLR Exercises"
+date: "October 12, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Chapter 2, Question 8
+
+Import the data "College.csv", available here:
+
+http://www-bcf.usc.edu/~gareth/ISL/data.html
+
+> (a) Use the read.csv() function to read the data into R. Call the
+> loaded data college. Make sure that you have the directory set
+> to the correct location for the data.
+
+We use readr::read_csv().
+
+```{r}
+college <- read_csv("College.csv")
+```
+
+Note the data was missing a column header for college name. read_csv imputed a column name, 'X1'. We can fix this with dplyr::rename().  
+
+```{r}
+college <- college %>%
+  rename(school = X1) 
+```
+
+> Use the summary() function to produce a numerical summary of the variables in the data set.
+
+Base R functions work just fine. summary() is an excellent example.
+
+```{r}
+summary(college)
+```
+
+Since using readr::read_csv(), we can also just call college to get info on atomic class of each column in the table.
+
+```{r}
+college
+```
+
+> Use the pairs() function to produce a scatterplot matrix of the first ten columns or variables of the data. 
+
+Scatterplot matrices work best with numeric data. We can select only the numeric columns with dplyr::select_if(). And then select the first ten columns with dplyr::select().
+
+```{r}
+college %>%
+  select_if(is_numeric) %>% 
+  select(1:10) %>%
+  pairs()
+```
+
+> Use the plot() function to produce side-by-side boxplots of Outstate versus Private.
+
+Inside of ggplot2::ggplot(), we set the x and y-axes with aes(), then add a geom layer to create the boxplots.
+
+```{r}
+college %>% 
+  ggplot(aes(x = Private, y = Outstate)) + geom_boxplot()
+```
+
+> Create a new qualitative variable, called Elite, by binning
+> the Top10perc variable. We are going to divide universities
+> into two groups based on whether or not the proportion
+> of students coming from the top 10 % of their high school
+> classes exceeds 50 %.
+
+dplyr::mutate() makes it much easier to create a new 'Elite' variable.
+
+```{r}
+college <- college %>% 
+  mutate(Elite = if_else(Top10perc > 50, "Yes", "No"))
+```
+
+> Use the summary() function to see how many elite universities
+there are. 
+
+Or we can use dplyr::count().
+
+```{r}
+college %>%
+  count(Elite)
+```
+
+> Now use the plot() function to produce side-by-side boxplots of Outstate versus Elite.
+
+Same ggplot as above, but this time we first pass the 'Elite' argument into the aes(), to set the aesthetics of our plot. 
+
+```{r}
+college %>% 
+  ggplot(aes(Elite, Outstate)) + geom_boxplot()
+```
+
+Unsurpising discovery that Elite schools appear to have higher tuition, on average. 
+
+> v. Use the hist() function to produce some histograms with
+> diﬀering numbers of bins for a few of the quantitative variables.
+> You may find the commandpar(mfrow=c(2,2)) useful:
+> it will divide the print window into four regions so that four
+> plots can be made simultaneously. Modifying the arguments
+> to this function will divide the screen in other ways.
+
+Add your variable of interest -- say, Grad.Rate -- to the aes(), and switch the geom layer to geom_histogram().
+
+```{r}
+college %>%
+  ggplot(aes(Grad.Rate)) + geom_histogram()
+```
+
