@@ -102,15 +102,211 @@ Unsurpising discovery that Elite schools appear to have higher tuition, on avera
 
 > v. Use the hist() function to produce some histograms with
 > diﬀering numbers of bins for a few of the quantitative variables.
+
+
+For a single histogram, add your variable of interest -- say, Grad.Rate -- to the aes(), and switch the geom layer to geom_histogram().
+
+```{r}
+college %>%
+  ggplot(aes(Grad.Rate, ..density..)) + geom_histogram()
+```
+
 > You may find the commandpar(mfrow=c(2,2)) useful:
 > it will divide the print window into four regions so that four
 > plots can be made simultaneously. Modifying the arguments
 > to this function will divide the screen in other ways.
 
-Add your variable of interest -- say, Grad.Rate -- to the aes(), and switch the geom layer to geom_histogram().
+For multiple ggplots, use gridExtra::grid.arrange():
 
 ```{r}
-college %>%
-  ggplot(aes(Grad.Rate)) + geom_histogram()
+library(gridExtra)
+
+g1 <- college %>% ggplot(aes(Top10perc)) + geom_histogram()
+g2 <- college %>% ggplot(aes(Top25perc)) + geom_histogram()
+
+grid.arrange(g1, g2, ncol = 2)
+```
+
+## Question 9
+
+> 9. This exercise involves the Auto data set studied in the lab. Make sure
+> that the missing values have been removed from the data.
+
+Auto data set is in the ISLR package.
+
+Three useful functions for inspecting the Auto data:
+
+```{r}
+library(ISLR)
+
+summary(Auto)
+str(Auto)
+View(Auto)
+```
+
+Two methods to be very sure we have no missing values, NA. 
+
+Good ol' dplyr:
+
+```{r}
+Auto %>%
+  select(everything()) %>%
+  summarise_all(funs(sum(is.na(.))))
+```
+
+Or, we can map (apply) a function (or nested functions) across all columns of a data frame using purrr::map():
+
+```{r}
+Auto %>%
+  map(~sum(is.na(.)))
+```
+
+purr::map_dfr() does the same thing, but returns results as a data frame
+
+```{r}
+Auto %>%
+  map_dfr(~sum(is.na(.)))
+```
+
+There appear to be no missing values in any columns in Auto.
+
+> (a) Which of the predictors are quantitative, and which are qualitative?
+
+One excellent way of distinguishing whether a numeric vector is a quantitative or qualitative value is to determine if the ratio between numeric values is meaningful.
+
+Another way is to see how many distinct values of each predictor are in the data, using dplyr::n_distinct():
+
+```{r}
+Auto %>%
+  map_dfr(~n_distinct(.))
+```
+
+In this data, cylinders has 5 distinct values across 392 rows, or observations. cylinders should likely be treated as a categorical or qualitative value, where each auto falls into 1 of 5 possible cylinder counts. Similar treatment of year and origin is appropriate for this data set.
+
+> (b) What is the range of each quantitative predictor? You can answer
+this using the range() function.
+
+Select our quantitative predictors, and map the range() function over each:
+
+```{r}
+Auto %>%
+  select(mpg, displacement, horsepower, weight, acceleration) %>%
+  map_dfr(~range(.))
+```
+
+> (c) What is the mean and standard deviation of each quantitative
+predictor?
+
+We could map each of mean() and sd() over each column independently, as above. Here, we first write a helper function mean_sd() that returns both the mean and standard deviation. Then we use map as before.
+
+```{r}
+mean_sd <- function(x) c(mean(x), sd(x))
+
+Auto %>%
+  select(mpg, displacement, horsepower, weight, acceleration) %>%
+  map_dfr(~mean_sd(.))
+```
+
+> (d) Now remove the 10th through 85th observations. What is the
+range, mean, and standard deviation of each predictor in the
+subset of the data that remains?
+
+Observations in a data set are rows. Above we used dplyr::select() to choose the columns we wanted. The equivalent for rows is dplyr::filter(). But for this operation, dplyr::slice() works even better.
+
+```{r}
+all_stats <- function(x) c(mean(x), sd(x), range(x))
+
+Auto %>%
+  select(mpg, displacement, horsepower, weight, acceleration) %>%
+  slice(-10:-85) %>%
+  map_dfr(~all_stats(.))
+```
+
+Note, above, the all_stats() function returns 4 values for each quantitative predictor: mean, standard deviation, lower bound (min), and upper bound (max)
+
+> (e) Using the full data set, investigate the predictors graphically,
+using scatterplots or other tools of your choice. Create some plots
+highlighting the relationships among the predictors. Comment
+on your findings.
+
+> (f) Suppose that we wish to predict gas mileage (mpg) on the basis
+of the other variables. Do your plots suggest that any of the
+other variables might be useful in predicting mpg? Justify your
+answer.
+
+pairs() is an easy way to inspect quantitative predictors for pairwise correllation
+
+```{r}
+Auto %>% 
+  select(mpg, displacement, horsepower, weight, acceleration) %>%
+  pairs()
+```
+
+mpg appears to be negatively linearly correlated with each of displacement, horsepower, and weight. Those three predictors appear to be strongly correlated with each other, pairwise. While some combination of the three likely help explain mpg variance, a model that includes all three could be at risk of overfitting.
+
+Correllation between mpg and acceleration is less obvious here, perhaps a weak positive correllation? Certainly too early to rule out acceleration as a predictor of mpg, particularly since acceleration appears to be negatively correllated with displacement and horsepower -- both likely candidates to predict mpg. 
+
+What about mpg vs. our qualitative variables -- cylinders, year, and origin?
+
+ggplot2 will treat cylinders as a qualitative variable if we first convert it from numeric to character with mutate():
+
+```{r}
+Auto %>%
+  mutate(cylinders = as.character(cylinders)) %>%
+  ggplot(aes(cylinders, mpg)) + geom_boxplot()
+```
+
+Certainly, some of the variance in mpg appears to be explained by the number of cylinders, so any model would want to include this qualitative predictor.
+
+Similarly, for year and origin:
+
+
+```{r}
+g1 <- Auto %>%
+  mutate(year = as.character(year)) %>%
+  ggplot(aes(year, mpg)) + geom_boxplot()
+
+g2 <- Auto %>%
+  mutate(origin = as.character(origin)) %>%
+  ggplot(aes(origin, mpg)) + geom_boxplot()
+
+grid.arrange(g1, g2, ncol = 2)
+```
+
+Similarly, there appears to be enough variance in mpg between different values of year and origin to not rule out adding them as predictors to a model. 
+
+## Question 10
+
+> 10. This exercise involves the Boston housing data set.
+(a) To begin, load in the Boston data set. The Boston data set is
+part of the MASS library in R.
+
+```{r}
+library(MASS)
+
+?Boston
+```
+
+> How many rows are in this data set? How many columns? What
+do the rows and columns represent?
+
+```{r}
+Boston %>% nrow()
+Boston %>% ncol()
+```
+
+Each row represents a town, and each column represents a statistic of the population.
+
+> (b) Make some pairwise scatterplots of the predictors (columns) in
+this data set. Describe your findings.
+
+```{r}
+str(Boston)
+```
+
+```{r}
+Boston %>%
+  select_if(function(x) n_distinct(x) > 30) %>%
+  pairs()
 ```
 
